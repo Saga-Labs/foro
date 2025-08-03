@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Forum - Intelligent Discussions</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <h1 class="logo">
+                    <i class="fas fa-comments"></i>
+                    AI Forum
+                </h1>
+                <button class="settings-btn" id="settingsBtn">
+                    <i class="fas fa-cog"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Topic Input Section -->
+            <section class="topic-section">
+                <div class="topic-input-container">
+                    <div class="topic-input-wrapper">
+                        <textarea id="topicInput" placeholder="What would you like the AIs to discuss?" class="topic-input" rows="4"></textarea>
+                        <button class="start-btn" id="startBtn">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                    <div class="mode-selector">
+                        <button class="mode-btn active" data-mode="dialog">
+                            <i class="fas fa-comments"></i>
+                            Dialog
+                        </button>
+                        <button class="mode-btn" data-mode="debate">
+                            <i class="fas fa-balance-scale"></i>
+                            Debate
+                        </button>
+                        <button class="mode-btn" data-mode="brainstorm">
+                            <i class="fas fa-lightbulb"></i>
+                            Brainstorm
+                        </button>
+                        <button class="mode-btn" data-mode="prediction">
+                            <i class="fas fa-crystal-ball"></i>
+                            Prediction
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Chat Section -->
+            <section class="chat-section" id="chatSection">
+                <div class="chat-container" id="chatContainer">
+                    <!-- Messages will be dynamically added here -->
+                </div>
+            </section>
+            
+            <!-- Chat Controls at Bottom -->
+            <div class="chat-controls">
+                <button class="control-btn" id="pauseBtn" style="display: none;">
+                    <i class="fas fa-pause"></i>
+                    Pause
+                </button>
+                <button class="control-btn" id="stopBtn" style="display: none;">
+                    <i class="fas fa-stop"></i>
+                    Stop
+                </button>
+            </div>
+
+            <!-- Summary Section -->
+            <section class="summary-section" id="summarySection" style="display: none;">
+                <div class="summary-container">
+                    <h3><i class="fas fa-clipboard-list"></i> Discussion Summary</h3>
+                    <div class="summary-content" id="summaryContent">
+                        <!-- Summary will be generated here -->
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Settings Modal -->
+        <div class="modal-overlay" id="settingsModal">
+            <div class="modal">
+                <div class="modal-header">
+                    <h2><i class="fas fa-cog"></i> Settings</h2>
+                    <button class="close-btn" id="closeSettingsBtn">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-content">
+                    <div class="settings-section">
+                        <h3>Agent 1 Configuration</h3>
+                        <div class="input-group">
+                            <label for="providerAgent1">Provider</label>
+                            <select id="providerAgent1" class="settings-select">
+                                <option value="openai">OpenAI</option>
+                                <option value="anthropic">Anthropic</option>
+                                <option value="openrouter">OpenRouter</option>
+                                <option value="lmstudio">LM Studio</option>
+                                <option value="ollama">Ollama</option>
+                                <option value="google">Google AI</option>
+                                <option value="cohere">Cohere</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label for="modelAgent1">Model</label>
+                            <select id="modelAgent1" class="settings-select">
+                                <option value="">Loading models...</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label for="apiKeyAgent1">API Key</label>
+                            <input type="password" id="apiKeyAgent1" class="settings-input" placeholder="Enter API key">
+                        </div>
+                        <div class="input-group" id="baseUrlAgent1Group" style="display: none;">
+                            <label for="baseUrlAgent1">Base URL</label>
+                            <input type="text" id="baseUrlAgent1" class="settings-input" placeholder="http://localhost:1234/v1">
+                        </div>
+                    </div>
+                    
+                    <div class="settings-section">
+                        <h3>Agent 2 Configuration</h3>
+                        <div class="input-group">
+                            <label for="providerAgent2">Provider</label>
+                            <select id="providerAgent2" class="settings-select">
+                                <option value="openai">OpenAI</option>
+                                <option value="anthropic">Anthropic</option>
+                                <option value="openrouter">OpenRouter</option>
+                                <option value="lmstudio">LM Studio</option>
+                                <option value="ollama">Ollama</option>
+                                <option value="google">Google AI</option>
+                                <option value="cohere">Cohere</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label for="modelAgent2">Model</label>
+                            <select id="modelAgent2" class="settings-select">
+                                <option value="">Loading models...</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label for="apiKeyAgent2">API Key</label>
+                            <input type="password" id="apiKeyAgent2" class="settings-input" placeholder="Enter API key">
+                        </div>
+                        <div class="input-group" id="baseUrlAgent2Group" style="display: none;">
+                            <label for="baseUrlAgent2">Base URL</label>
+                            <input type="text" id="baseUrlAgent2" class="settings-input" placeholder="http://localhost:1234/v1">
+                        </div>
+                    </div>
+                    
+                    <div class="settings-section">
+                        <h3>Discussion Settings</h3>
+                        <div class="input-group">
+                            <label for="maxTurns">Max Turns per Discussion</label>
+                            <input type="number" id="maxTurns" class="settings-input" value="6" min="2" max="20">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-secondary" id="cancelSettingsBtn">Cancel</button>
+                    <button class="btn-primary" id="saveSettingsBtn">Save Settings</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading Overlay -->
+        <div class="loading-overlay" id="loadingOverlay" style="display: none;">
+            <div class="loading-spinner">
+                <i class="fas fa-spinner fa-spin"></i>
+                <p>Initializing AI discussion...</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

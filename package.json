@@ -1,0 +1,36 @@
+{
+  "name": "ai-forum",
+  "version": "1.0.0",
+  "description": "An intelligent forum application with sophisticated AI conversation modes",
+  "main": "index.html",
+  "scripts": {
+    "start": "python3 -m http.server 8000",
+    "dev": "python3 -m http.server 8000",
+    "serve": "npx http-server -p 8000 -c-1"
+  },
+  "keywords": [
+    "ai",
+    "forum",
+    "conversation",
+    "openai",
+    "anthropic",
+    "ollama",
+    "lmstudio"
+  ],
+  "author": "AI Forum Team",
+  "license": "MIT",
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/ai-forum.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/ai-forum/issues"
+  },
+  "homepage": "https://github.com/yourusername/ai-forum#readme"
+}
