@@ -2,6 +2,7 @@ class AIForum {
     constructor() {
         this.currentMode = 'dialog';
         this.isDiscussionActive = false;
+        this.isPaused = false;
         this.currentTurn = 0;
         this.maxTurns = 6;
         this.messages = [];
@@ -13,6 +14,113 @@ class AIForum {
         this.loadProviderModels();
     }
 
+// Mode-specific sample topics
+getModeExamples() {
+    // Larger pools per mode for variety
+    const pools = {
+        dialog: [
+            'What are practical ways to adopt AI responsibly in small teams?',
+            'How can remote teams keep knowledge sharing effective?',
+            'When is TypeScript worth it for small projects?',
+            'How to balance speed vs. quality in MVPs?',
+            'How do you structure design reviews for faster iteration?',
+            'What are effective ways to document decisions in startups?',
+            'How can small teams improve incident response without burnout?',
+            'What metrics actually matter for developer productivity?'
+        ],
+        debate: [
+            'Should governments prioritize carbon taxes over subsidies?',
+            'Is AGI more likely within 10 years or 50 years?',
+            'Are mobile apps still better than PWAs?',
+            'Should universities ban AI assistants in exams?',
+            'Is remote work better than hybrid for productivity?',
+            'Should startups adopt microservices early or stick to monoliths?',
+            'Is strict type safety worth the velocity cost?',
+            'Should social media require real-name verification?'
+        ],
+        brainstorm: [
+            'New side-project ideas combining AI + productivity',
+            'Ways to reduce onboarding time for new devs',
+            'Ideas to make code reviews faster and better',
+            'Features for a minimalist note-taking app',
+            'Ideas to make meetings shorter but more effective',
+            'Ways to visualize team progress without burdensome tracking',
+            'Ideas to help juniors ramp up on large codebases',
+            'Features that make docs more discoverable'
+        ],
+        prediction: [
+            'Will LLM inference costs drop by 5x in 12 months?',
+            'Chances of global recessions in the next 18 months',
+            'Will WebAssembly become mainstream for web apps by 2027?',
+            'Will EU pass sweeping AI regulations this year?',
+            'Will on-device LLMs outperform cloud for common tasks in 2 years?',
+            'Will VR headsets hit mass adoption (>50M units/year) by 2028?',
+            'Will TypeScript usage decline in favor of static analysis tools?',
+            'Will autonomous driving reach Level 4 in major cities by 2027?'
+        ]
+    };
+    return pools[this.currentMode] || pools.dialog;
+}
+
+getRecentExamplesKey() {
+    return `ai-forum-example-history-${this.currentMode}`;
+}
+
+getRecentExamples() {
+    try {
+        return JSON.parse(localStorage.getItem(this.getRecentExamplesKey())) || [];
+    } catch {
+        return [];
+    }
+}
+
+saveRecentExamples(list) {
+    try {
+        localStorage.setItem(this.getRecentExamplesKey(), JSON.stringify(list));
+    } catch {}
+}
+
+pickExamples(pool, count = 4) {
+    const recent = new Set(this.getRecentExamples());
+    // Randomize pool
+    const shuffled = pool.slice().sort(() => Math.random() - 0.5);
+    const picked = [];
+    for (const item of shuffled) {
+        if (!recent.has(item)) {
+            picked.push(item);
+        }
+        if (picked.length === count) break;
+    }
+    // If not enough, fill from remaining
+    if (picked.length < count) {
+        for (const item of shuffled) {
+            if (!picked.includes(item)) picked.push(item);
+            if (picked.length === count) break;
+        }
+    }
+    // Update recent history (limit size)
+    const newRecent = picked.concat(Array.from(recent)).slice(0, 20);
+    this.saveRecentExamples(newRecent);
+    return picked;
+}
+
+renderSuggestions() {
+    // Render external chips row (outside the input)
+    if (!this.suggestionsContainer) return;
+    const pool = this.getModeExamples();
+    const examples = this.pickExamples(pool, 4);
+    this.lastExamples = examples;
+    this.suggestionsContainer.innerHTML = examples.map(ex => (
+        `<button class=\"suggestion-chip\" data-example=\"${ex.replace(/\"/g, '&quot;')}\">${ex}</button>`
+    )).join('');
+    // Ensure chip row is visible (outside input)
+    this.suggestionsContainer.style.display = '';
+    // Keep inline samples hidden
+    if (this.inlineSamples) this.inlineSamples.style.display = 'none';
+
+    // Do not mirror to a top bar; samples should be shown only inside the input
+}
+
     initializeElements() {
         // Main elements
         this.mainContent = document.querySelector('.main-content');
@@ -22,6 +130,13 @@ class AIForum {
         this.chatSection = document.getElementById('chatSection');
         this.summarySection = document.getElementById('summarySection');
         this.summaryContent = document.getElementById('summaryContent');
+        this.toastContainer = document.getElementById('toastContainer');
+        this.suggestionsContainer = document.querySelector('.suggestions');
+        this.currentTopicBar = document.getElementById('currentTopicBar');
+        this.suggestionsTopBar = document.getElementById('suggestionsTopBar');
+        this.inlineSamples = document.getElementById('inlineSamples');
+        this.lastExamples = [];
+        if (this.inlineSamples) this.inlineSamples.style.display = 'none';
         
         // Set initial state
         this.mainContent.classList.add('initial-state');
@@ -60,6 +175,11 @@ class AIForum {
         
         // Loading overlay
         this.loadingOverlay = document.getElementById('loadingOverlay');
+
+        // Initialize start button state
+        if (this.startBtn && this.topicInput) {
+            this.startBtn.disabled = !this.topicInput.value.trim();
+        }
     }
 
     bindEvents() {
@@ -76,9 +196,39 @@ class AIForum {
                 this.startDiscussion();
             }
         });
+        this.topicInput.addEventListener('input', () => {
+            this.startBtn.disabled = !this.topicInput.value.trim();
+            // Hide inline samples while typing
+            if (this.inlineSamples) {
+                this.inlineSamples.style.display = 'none';
+            }
+        });
+        // Hide inline samples on focus, show on blur if empty
+        this.topicInput.addEventListener('focus', () => {
+            if (this.inlineSamples) this.inlineSamples.style.display = 'none';
+        });
+        this.topicInput.addEventListener('blur', () => {
+            if (this.inlineSamples) {
+                const empty = !this.topicInput.value.trim();
+                this.inlineSamples.style.display = empty ? 'block' : 'none';
+            }
+        });
+        // Suggestion chips (event delegation for dynamic content)
+        if (this.suggestionsContainer) {
+            this.suggestionsContainer.addEventListener('click', (e) => {
+                const chip = e.target.closest('.suggestion-chip');
+                if (!chip) return;
+                const val = chip.dataset.example || chip.textContent.trim();
+                this.topicInput.value = val;
+                this.topicInput.focus();
+                this.startBtn.disabled = !this.topicInput.value.trim();
+                if (this.inlineSamples) this.inlineSamples.style.display = 'none';
+            });
+        }
+        // Inline samples are hint text only (non-clickable)
         
         // Control buttons
-        this.pauseBtn.addEventListener('click', () => this.pauseDiscussion());
+        this.pauseBtn.addEventListener('click', () => this.togglePause());
         this.stopBtn.addEventListener('click', () => this.stopDiscussion());
         
         // Settings modal
@@ -100,6 +250,9 @@ class AIForum {
         
         // Load saved settings
         this.loadSettingsToUI();
+
+        // Initial suggestions render
+        this.renderSuggestions();
     }
 
     initializeProviders() {
@@ -172,6 +325,10 @@ class AIForum {
         } else {
             this.maxTurns = parseInt(this.maxTurnsInput?.value) || 6;
         }
+        if (this.maxTurnsInput) this.maxTurnsInput.value = this.maxTurns;
+
+        // Update suggestions (inline) for the new mode
+        this.renderSuggestions();
     }
 
     async startDiscussion() {
@@ -187,6 +344,7 @@ class AIForum {
         }
 
         this.isDiscussionActive = true;
+        this.isPaused = false;
         this.currentTurn = 0;
         this.messages = [];
         
@@ -198,6 +356,12 @@ class AIForum {
         this.stopBtn.style.display = 'inline-flex';
         this.summarySection.style.display = 'none';
         this.chatContainer.innerHTML = '';
+        // Show compact topic bar
+        if (this.currentTopicBar) {
+            this.currentTopicBar.textContent = topic;
+            this.currentTopicBar.style.display = 'block';
+        }
+        // Do not show a top suggestions bar; use inline samples only
         
         try {
             await this.runDiscussion(topic);
@@ -222,27 +386,39 @@ class AIForum {
             const context = this.buildContext(topic, turn, agentIndex);
             
             try {
-                // Get AI response
-                const response = await this.getAIResponse(context, agent.prompt, agentIndex);
+                // Respect pause state
+                while (this.isPaused && this.isDiscussionActive) {
+                    await this.delay(150);
+                }
+                // Get AI response with retry and timeout
+                const response = await this.getAIResponseWithRetry(context, agent.prompt, agentIndex, { retries: 1, timeoutMs: 30000 });
                 
                 // Remove typing indicator
                 this.removeTypingIndicator();
                 
                 if (!this.isDiscussionActive) break;
                 
+                // Fallback if empty
+                const safeResponse = (response && response.trim()) ? response : '<response>Sorry, I had an issue generating a response. Let\'s continue.</response>';
+
                 // Add message with writing animation
-                await this.addMessageWithAnimation(agent.name, response, agentIndex + 1);
+                await this.addMessageWithAnimation(agent.name, safeResponse, agentIndex + 1);
                 
                 // Store message
                 this.messages.push({
                     agent: agent.name,
-                    content: response,
+                    content: safeResponse,
                     turn: turn + 1
                 });
                 
             } catch (error) {
+                // On error, do not stop entire discussion; add a brief fallback and continue
                 this.removeTypingIndicator();
-                throw error;
+                if (!this.isDiscussionActive) break;
+                const fallback = '<response>Sorry, I ran into a temporary issue. Let\'s continue.</response>';
+                await this.addMessageWithAnimation(agent.name, fallback, agentIndex + 1);
+                this.messages.push({ agent: agent.name, content: fallback, turn: turn + 1, error: true });
+                continue;
             }
         }
         
@@ -252,41 +428,110 @@ class AIForum {
         }
     }
 
+    // Wrapper to add timeout and retry for robustness
+    async getAIResponseWithRetry(context, systemPrompt, agentIndex, { retries = 1, timeoutMs = 30000 } = {}) {
+        const attempt = async () => {
+            const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Request timed out')), timeoutMs));
+            // We cannot actually abort the fetch here without wiring signals; treat timeout as failure
+            return await Promise.race([
+                this.getAIResponse(context, systemPrompt, agentIndex),
+                timeoutPromise
+            ]);
+        };
+        let lastErr;
+        for (let i = 0; i <= retries; i++) {
+            try {
+                const res = await attempt();
+                return res;
+            } catch (err) {
+                lastErr = err;
+                await this.delay(300 + i * 300);
+            }
+        }
+        throw lastErr || new Error('Failed to get AI response');
+    }
+
     getAgentPrompts(topic) {
         const baseInstructions = {
             dialog: {
-                agent1: `You are participating in a discussion about "${topic}". 
+                agent1: `You are discussing "${topic}".
 
-Structure your response as follows:
 <thought>
-Your detailed reasoning and analysis (2-3 sentences maximum). Consider different perspectives and evidence.
+Think through your point succinctly (<=2 sentences). Consider balance and clarity.
 </thought>
 
 <response>
-Your main response (1 short paragraph only, 2-3 sentences maximum). Be direct and conversational. Do NOT start with phrases like "Agent 1 has" or "As Agent 1" or reference yourself in third person. Just give your perspective naturally.
+2-3 concise sentences. Be natural and collaborative. Do not refer to yourself as an agent.
 </response>`,
-                agent2: `You are participating in a discussion about "${topic}". 
+                agent2: `You are continuing the discussion on "${topic}".
 
-Structure your response as follows:
 <thought>
-Your detailed reasoning and analysis (2-3 sentences maximum). Consider different perspectives and evidence.
+Decide what to add or clarify (<=2 sentences). Prefer complementing, not repeating.
 </thought>
 
 <response>
-Your main response (1 short paragraph only, 2-3 sentences maximum). Be direct and conversational. Do NOT start with phrases like "Agent 2 has" or "As Agent 2" or reference yourself in third person. Just give your perspective naturally.
+2-3 concise sentences that build on prior points with one new insight or example.
 </response>`
             },
             debate: {
-                agent1: `You are the PRO agent in a debate about "${topic}". Your role is to support the position, counter arguments, present evidence, and build momentum. Keep your response to 2-3 sentences maximum. Use confident language like "This approach works because...", "Evidence suggests...". Be sharp and substantive like a skilled debater. Build on previous arguments naturally.`,
-                agent2: `You are the CON agent in a debate about "${topic}". Your role is to oppose the position, challenge claims, expose flaws, and question assumptions. Keep your response to 2-3 sentences maximum. Use confident language like "This approach fails because...", "Evidence suggests otherwise...". Be sharp and substantive like a skilled debater. Counter previous arguments directly.`
+                agent1: `You are the PRO side for "${topic}".
+
+<thought>
+Pick one strong claim and supporting evidence (<=2 sentences).
+</thought>
+
+<response>
+State 1 clear claim for PRO and 1 piece of evidence. 2-3 sentences, persuasive and civil.
+</response>`,
+                agent2: `You are the CON side for "${topic}".
+
+<thought>
+Pick the best counter-argument and evidence (<=2 sentences).
+</thought>
+
+<response>
+State 1 clear counter-claim for CON and 1 piece of evidence. 2-3 sentences, persuasive and civil.
+</response>`
             },
             brainstorm: {
-                agent1: `You are Agent 1 in a brainstorming session about "${topic}". Generate 1-2 NEW creative ideas that haven't been mentioned yet. Keep your response to 2-3 sentences maximum. Start with natural introductory prose, then format ideas with **Bold Titles**. Think outside conventional approaches while remaining practical.`,
-                agent2: `You are Agent 2 in a brainstorming session about "${topic}". Generate 1-2 NEW creative ideas that build on or differ from previous suggestions. Keep your response to 2-3 sentences maximum. Start with natural introductory prose, then format ideas with **Bold Titles**. Think outside conventional approaches while remaining practical.`
+                agent1: `You are brainstorming novel ideas about "${topic}".
+
+<thought>
+Aim for diversity and feasibility (<=2 sentences).
+</thought>
+
+<response>
+List exactly 3 distinct ideas as '- Idea'. Avoid duplicates of any previously listed ideas.
+</response>`,
+                agent2: `You are adding more ideas about "${topic}".
+
+<thought>
+Complement existing ideas with different angles (<=2 sentences).
+</thought>
+
+<response>
+List exactly 3 new and non-overlapping ideas as '- Idea'.
+</response>`
             },
             prediction: {
-                agent1: `You are Agent 1 making an evidence-based prediction about "${topic}". Start with analytical context, then provide your prediction. If the question asks for odds/percentage, format as **Prediction: X%**. If it's open-ended, format as **Prediction: [specific answer]**. Consider multiple variables: trends, historical patterns, external factors. Base your prediction on data points and expert consensus where available.`,
-                agent2: `You are Agent 2 making an evidence-based prediction about "${topic}". Start with analytical context, then provide your prediction. If the question asks for odds/percentage, format as **Prediction: X%**. If it's open-ended, format as **Prediction: [specific answer]**. Consider multiple variables: trends, historical patterns, external factors. Base your prediction on data points and expert consensus where available. Your analysis may agree or disagree with the previous prediction.`
+                agent1: `You are making a calibrated prediction about "${topic}".
+
+<thought>
+Identify key drivers and uncertainty (<=2 sentences).
+</thought>
+
+<response>
+Provide 1 prediction with probability 'P=0.xx' and a brief justification (1 sentence). Optionally add 1 key condition.
+</response>`,
+                agent2: `You are making a second calibrated prediction about "${topic}".
+
+<thought>
+Consider whether to agree or disagree and why (<=2 sentences).
+</thought>
+
+<response>
+Provide 1 prediction with 'P=0.xx'. If disagreeing, state why in 1 sentence; otherwise add a complementary factor.
+</response>`
             }
         };
 
@@ -307,12 +552,23 @@ Your main response (1 short paragraph only, 2-3 sentences maximum). Be direct an
             });
         }
         
-        context += `You are responding as ${agentIndex === 0 ? 'Agent 1' : 'Agent 2'} on turn ${turn + 1} of ${this.maxTurns}.`;
-        
-        if (this.currentMode === 'brainstorm') {
-            context += ` Generate NEW ideas that haven't been mentioned yet.`;
-        } else if (this.currentMode === 'prediction' && turn === 1) {
-            context += ` You may agree or disagree with the previous prediction.`;
+        const turnNumber = turn + 1;
+        const who = agentIndex === 0 ? 'Agent 1' : 'Agent 2';
+        context += `You are responding as ${who} on turn ${turnNumber} of ${this.maxTurns}.`;
+
+        // Mode-specific guidance per turn
+        if (this.currentMode === 'debate') {
+            const role = agentIndex === 0 ? 'PRO' : 'CON';
+            context += ` Your role is ${role}. Avoid repeating previous points; prefer rebuttal or new evidence.`;
+            if (turnNumber > 1) {
+                context += ` Briefly rebut the most recent opposing point in 1 sentence, then add your new claim/evidence.`;
+            }
+        } else if (this.currentMode === 'brainstorm') {
+            context += ` Only propose NEW ideas not already listed. Keep each idea 1 short line.`;
+        } else if (this.currentMode === 'prediction') {
+            context += ` Include a calibrated probability in 'P=0.xx' format. If disagreeing with prior, state why briefly.`;
+        } else if (this.currentMode === 'dialog') {
+            context += ` Add one new insight or example; avoid repeating prior text.`;
         }
         
         return context;
@@ -419,9 +675,9 @@ Your main response (1 short paragraph only, 2-3 sentences maximum). Be direct an
             <div class="message-header">
                 <div class="agent-info">
                     <div class="agent-avatar">${agentName.charAt(agentName.length - 1)}</div>
-                    <div class="agent-details">
-                        <div class="agent-name">${agentName}</div>
-                    </div>
+                </div>
+                <div class="agent-meta">
+                    <div class="agent-name">${agentName}</div>
                 </div>
             </div>
             <div class="typing-indicator">
@@ -477,13 +733,13 @@ Your main response (1 short paragraph only, 2-3 sentences maximum). Be direct an
         messageDiv.innerHTML = `
             <div class="message-header">
                 <div class="agent-info">
-                    <div class="agent-avatar">${agentNumber}</div>
-                    <div class="agent-details">
-                        <div class="agent-name">${agentName}</div>
-                        <div class="agent-model">${modelName}</div>
-                    </div>
+                    <div class="agent-avatar">${agentName.charAt(agentName.length - 1)}</div>
                 </div>
-                <div class="message-time">${currentTime}</div>
+                <div class="agent-meta">
+                    <div class="agent-name">${agentName}</div>
+                    <div class="agent-model">${modelName}</div>
+                    <div class="message-time">${currentTime}</div>
+                </div>
             </div>
             <div class="message-content">
                 <div class="message-text"></div>
@@ -574,8 +830,21 @@ Your main response (1 short paragraph only, 2-3 sentences maximum). Be direct an
         this.startBtn.innerHTML = '<i class="fas fa-play"></i> Resume';
     }
 
+    togglePause() {
+        if (!this.isDiscussionActive) return;
+        this.isPaused = !this.isPaused;
+        if (this.isPaused) {
+            this.pauseBtn.innerHTML = '<i class="fas fa-play"></i> Resume';
+            this.showToast('success', 'Paused');
+        } else {
+            this.pauseBtn.innerHTML = '<i class="fas fa-pause"></i> Pause';
+            this.showToast('success', 'Resumed');
+        }
+    }
+
     stopDiscussion() {
         this.isDiscussionActive = false;
+        this.isPaused = false;
         
         // Reset layout to initial state
         this.mainContent.classList.remove('discussion-active');
@@ -586,6 +855,19 @@ Your main response (1 short paragraph only, 2-3 sentences maximum). Be direct an
         this.startBtn.style.display = 'inline-flex';
         this.startBtn.innerHTML = '<i class="fas fa-paper-plane"></i>';
         this.removeTypingIndicator();
+        // Hide compact topic bar
+        if (this.currentTopicBar) {
+            this.currentTopicBar.style.display = 'none';
+            this.currentTopicBar.textContent = '';
+        }
+        // Hide compact suggestions bar
+        if (this.suggestionsTopBar) {
+            this.suggestionsTopBar.style.display = 'none';
+            this.suggestionsTopBar.innerHTML = '';
+        }
+
+        // Refresh suggestions so the next chat shows a new randomized set
+        this.renderSuggestions();
     }
 
     // Settings Management
@@ -629,6 +911,11 @@ Your main response (1 short paragraph only, 2-3 sentences maximum). Be direct an
 
         const provider1 = this.providers[newSettings.agent1.provider];
         const provider2 = this.providers[newSettings.agent2.provider];
+        const supportedProviders = ['openai','anthropic','openrouter','lmstudio','ollama'];
+        if (!supportedProviders.includes(newSettings.agent1.provider) || !supportedProviders.includes(newSettings.agent2.provider)) {
+            this.showError('Selected provider not yet supported in this app');
+            return;
+        }
         
         if ((provider1.requiresKey && !newSettings.agent1.apiKey) || 
             (provider2.requiresKey && !newSettings.agent2.apiKey)) {
@@ -637,6 +924,7 @@ Your main response (1 short paragraph only, 2-3 sentences maximum). Be direct an
         }
 
         this.settings = newSettings;
+        this.maxTurns = newSettings.maxTurns;
         this.saveSettingsToStorage();
         this.closeSettings();
         this.showSuccess('Settings saved successfully');
@@ -828,13 +1116,34 @@ Your main response (1 short paragraph only, 2-3 sentences maximum). Be direct an
     }
 
     showError(message) {
-        // Simple error display - could be enhanced with a proper notification system
-        alert(`Error: ${message}`);
+        this.showToast('error', message);
     }
 
     showSuccess(message) {
-        // Simple success display - could be enhanced with a proper notification system
-        console.log(`Success: ${message}`);
+        this.showToast('success', message);
+    }
+
+    showToast(type, message) {
+        // Fallback to console if container missing
+        if (!this.toastContainer) {
+            if (type === 'error') console.error(message);
+            else console.log(message);
+            return;
+        }
+        const toast = document.createElement('div');
+        toast.className = `toast toast-${type}`;
+        const icon = type === 'error' ? 'fa-circle-exclamation' : 'fa-circle-check';
+        toast.innerHTML = `
+            <i class="fas ${icon} toast-icon"></i>
+            <span class="toast-message">${message}</span>
+            <button class="toast-close" aria-label="Close">&times;</button>
+        `;
+        this.toastContainer.appendChild(toast);
+        const remove = () => {
+            if (toast && toast.parentNode) toast.parentNode.removeChild(toast);
+        };
+        toast.querySelector('.toast-close').addEventListener('click', remove);
+        setTimeout(remove, 4000);
     }
 
     delay(ms) {

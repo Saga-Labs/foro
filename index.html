@@ -33,6 +33,13 @@
                         <button class="start-btn" id="startBtn">
                             <i class="fas fa-paper-plane"></i>
                         </button>
+                        <div class="inline-samples" id="inlineSamples"></div>
+                    </div>
+                    <div class="suggestions" aria-label="Quick examples">
+                        <button class="suggestion-chip" data-example="Will AI replace most software engineering jobs in the next 5 years?">AI and software jobs</button>
+                        <button class="suggestion-chip" data-example="Should we prioritize carbon taxes or clean energy subsidies to fight climate change?">Climate policy</button>
+                        <button class="suggestion-chip" data-example="Is TypeScript worth it for small frontend projects?">TypeScript for small apps</button>
+                        <button class="suggestion-chip" data-example="What are the pros and cons of remote-first teams?">Remote-first teams</button>
                     </div>
                     <div class="mode-selector">
                         <button class="mode-btn active" data-mode="dialog">
@@ -48,12 +55,17 @@
                             Brainstorm
                         </button>
                         <button class="mode-btn" data-mode="prediction">
-                            <i class="fas fa-crystal-ball"></i>
+                            <i class="fas fa-bullseye"></i>
                             Prediction
                         </button>
                     </div>
                 </div>
             </section>
+
+            <!-- Current Topic Bar (visible during discussion) -->
+            <div class="current-topic-bar" id="currentTopicBar" style="display: none;"></div>
+            <!-- Top Suggestions Bar (visible during discussion) -->
+            <div class="suggestions-top-bar" id="suggestionsTopBar" style="display: none;"></div>
 
             <!-- Chat Section -->
             <section class="chat-section" id="chatSection">
@@ -178,6 +190,9 @@
             </div>
         </div>
     </div>
+
+    <!-- Toasts -->
+    <div id="toastContainer" class="toast-container" aria-live="polite" aria-atomic="true"></div>
 
     <script src="app.js"></script>
 </body>
