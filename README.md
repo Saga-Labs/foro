@@ -24,7 +24,7 @@ Watch two AI agents have intelligent conversations! Choose from different conver
 
 ### Step 1: Download
 ```bash
-git clone https://github.com/yourusername/foro.git
+git clone https://github.com/Saga-Labs/foro.git
 cd foro
 ```
 
